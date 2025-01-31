@@ -1,97 +1,106 @@
-﻿#Persistent
-#NoEnv
+﻿#Persistent  ; Keeps the script running indefinitely
+#NoEnv       ; Avoids checking for unnecessary environment variables
 SendMode Input
-SetBatchLines -1
-SetWinDelay, -1
+SetBatchLines -1  ; Maximizes script execution speed
+SetWinDelay, -1   ; Reduces delay for window interactions
 
+; Global Variables
+; Path to NirSoft's SoundVolumeView utility
 global SVVPath := "C:\tools\SoundVolumeView.exe"
+; Keeps track of mute status for Firefox
 global Muted := False
 
-; Hotkeys for Firefox volume control
+;----------------------------
+; Hotkeys for Firefox Volume Control
+;----------------------------
 PgUp::
-    AdjustVolume("firefox.exe", 5)
+    AdjustVolume("firefox.exe", 5)  ; Increase Firefox volume by 5%
     return
 
 PgDn::
-    AdjustVolume("firefox.exe", -5)
+    AdjustVolume("firefox.exe", -5)  ; Decrease Firefox volume by 5%
     return
 
 End::
-    ToggleMute("firefox.exe", Muted)
-    Muted := !Muted
+    ToggleMute("firefox.exe", Muted)  ; Toggle mute for Firefox
+    Muted := !Muted  ; Invert mute status
     return
 
-; Hotkeys for focused application volume control
+;----------------------------
+; Hotkeys for Focused Application Volume Control
+;----------------------------
 ^PgUp:: 
-    FocusedAppVolume(+5)
+    FocusedAppVolume(+5)  ; Increase volume for the currently active app
     return
 
 ^PgDn:: 
-    FocusedAppVolume(-5)
+    FocusedAppVolume(-5)  ; Decrease volume for the currently active app
     return
 
 ^End:: 
-    FocusedAppToggleMute()
+    FocusedAppToggleMute()  ; Toggle mute for the currently active app
     return
 
+;----------------------------
+; Functions for Focused Application Volume Control
+;----------------------------
 FocusedAppVolume(Increment) {
     global SVVPath
-    ; Get the process name of the focused window
-    WinGet, FocusedApp, ProcessName, A
-    ; Adjust the volume for the focused application
+    WinGet, FocusedApp, ProcessName, A  ; Get the process name of the active window
     if (FocusedApp) {
-        AdjustVolume(FocusedApp, Increment)
+        AdjustVolume(FocusedApp, Increment)  ; Adjust volume for the focused application
     }
 }
 
 FocusedAppToggleMute() {
     static FocusedMuted := False
-    ; Get the process name of the focused window
-    WinGet, FocusedApp, ProcessName, A
-    ; Toggle mute for the focused application
+    WinGet, FocusedApp, ProcessName, A  ; Get the process name of the active window
     if (FocusedApp) {
-        ToggleMute(FocusedApp, FocusedMuted)
-        FocusedMuted := !FocusedMuted
+        ToggleMute(FocusedApp, FocusedMuted)  ; Toggle mute state
+        FocusedMuted := !FocusedMuted  ; Invert mute status
     }
 }
 
+;----------------------------
+; Core Volume Control Functions
+;----------------------------
 AdjustVolume(AppName, Increment) {
     global SVVPath
-    ; Adjust volume for the given application
-    RunWait, %SVVPath% /ChangeVolume "%AppName%" %Increment%, , Hide
+    RunWait, %SVVPath% /ChangeVolume "%AppName%" %Increment%, , Hide  ; Adjust volume using SoundVolumeView
     DisplayVolume(AppName, Increment > 0 ? "increased" : "decreased")
 }
 
 ToggleMute(AppName, IsMuted) {
     global SVVPath
-    ; Toggle mute for the given application
     if (IsMuted) {
-        RunWait, %SVVPath% /UnMute "%AppName%", , Hide
+        RunWait, %SVVPath% /UnMute "%AppName%", , Hide  ; Unmute application
         DisplayVolume(AppName, "unmuted")
     } else {
-        RunWait, %SVVPath% /Mute "%AppName%", , Hide
+        RunWait, %SVVPath% /Mute "%AppName%", , Hide  ; Mute application
         DisplayVolume(AppName, "muted")
     }
 }
 
+;----------------------------
+; GUI Feedback Function
+;----------------------------
 DisplayVolume(AppName, Action) {
     global SVVPath, VolumeText
-    ; Get the current volume percentage for the application
-    RunWait, %SVVPath% /GetPercent "%AppName%", , Hide
-    VolumeLevel := ErrorLevel  ; ErrorLevel contains the volume percentage multiplied by 10
-    Volume := Round(VolumeLevel / 10)  ; Adjust it to the actual volume percentage and round it
+    RunWait, %SVVPath% /GetPercent "%AppName%", , Hide  ; Get current volume level
+    VolumeLevel := ErrorLevel  ; ErrorLevel stores volume percentage * 10
+    Volume := Round(VolumeLevel / 10)  ; Convert to actual percentage
 
-    ; Display the volume information in a GUI
+    ; Display GUI notification for volume change
     Gui, Destroy
     Gui, +AlwaysOnTop +ToolWindow -Caption
-    Gui, Color, EEAA99 ; Pastel Pink
-    Gui, Font, s20 cBlack, BurbankBigCondensed-bold ; Using the correct Burbank Big Condensed Bold font
+    Gui, Color, EEAA99  ; Pastel Pink background
+    Gui, Font, s20 cBlack, BurbankBigCondensed-bold  ; Custom font for better readability
     Gui, Add, Text, w300 h50 Center vVolumeText, %AppName%`nVolume %Action%: %Volume%
-    Gui, Show, x10 y10 NoActivate
-    SetTimer, DestroyGUI, -2000  ; Double the time (2000 ms)
+    Gui, Show, x10 y10 NoActivate  ; Position GUI at top-left corner without activating window
+    SetTimer, DestroyGUI, -2000  ; Auto-close GUI after 2 seconds
     return
 }
 
 DestroyGUI:
-    Gui, Destroy
+    Gui, Destroy  ; Close volume display GUI
     return
