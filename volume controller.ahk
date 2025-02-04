@@ -4,41 +4,44 @@ SendMode Input
 SetBatchLines -1  ; Maximizes script execution speed
 SetWinDelay, -1   ; Reduces delay for window interactions
 
+; Improve hotkey responsiveness
+#HotkeyInterval 50  ; Reduce delay between hotkey presses
+#MaxHotkeysPerInterval 200  ; Allow more rapid hotkey activations
+
 ; Global Variables
-; Path to NirSoft's SoundVolumeView utility
 global SVVPath := "C:\tools\SoundVolumeView.exe"
-; Keeps track of mute status for Firefox
 global Muted := False
+global VolumeGuiOpen := False
 
 ;----------------------------
 ; Hotkeys for Firefox Volume Control
 ;----------------------------
 PgUp::
-    AdjustVolume("firefox.exe", 5)  ; Increase Firefox volume by 5%
+    AdjustVolume("firefox.exe", 5)
     return
 
 PgDn::
-    AdjustVolume("firefox.exe", -5)  ; Decrease Firefox volume by 5%
+    AdjustVolume("firefox.exe", -5)
     return
 
 End::
-    ToggleMute("firefox.exe", Muted)  ; Toggle mute for Firefox
-    Muted := !Muted  ; Invert mute status
+    ToggleMute("firefox.exe", Muted)
+    Muted := !Muted
     return
 
 ;----------------------------
 ; Hotkeys for Focused Application Volume Control
 ;----------------------------
 ^PgUp:: 
-    FocusedAppVolume(+5)  ; Increase volume for the currently active app
+    FocusedAppVolume(+5)
     return
 
 ^PgDn:: 
-    FocusedAppVolume(-5)  ; Decrease volume for the currently active app
+    FocusedAppVolume(-5)
     return
 
 ^End:: 
-    FocusedAppToggleMute()  ; Toggle mute for the currently active app
+    FocusedAppToggleMute()
     return
 
 ;----------------------------
@@ -46,18 +49,18 @@ End::
 ;----------------------------
 FocusedAppVolume(Increment) {
     global SVVPath
-    WinGet, FocusedApp, ProcessName, A  ; Get the process name of the active window
+    WinGet, FocusedApp, ProcessName, A
     if (FocusedApp) {
-        AdjustVolume(FocusedApp, Increment)  ; Adjust volume for the focused application
+        AdjustVolume(FocusedApp, Increment)
     }
 }
 
 FocusedAppToggleMute() {
     static FocusedMuted := False
-    WinGet, FocusedApp, ProcessName, A  ; Get the process name of the active window
+    WinGet, FocusedApp, ProcessName, A
     if (FocusedApp) {
-        ToggleMute(FocusedApp, FocusedMuted)  ; Toggle mute state
-        FocusedMuted := !FocusedMuted  ; Invert mute status
+        ToggleMute(FocusedApp, FocusedMuted)
+        FocusedMuted := !FocusedMuted
     }
 }
 
@@ -66,17 +69,17 @@ FocusedAppToggleMute() {
 ;----------------------------
 AdjustVolume(AppName, Increment) {
     global SVVPath
-    RunWait, %SVVPath% /ChangeVolume "%AppName%" %Increment%, , Hide  ; Adjust volume using SoundVolumeView
+    Run, %SVVPath% /ChangeVolume "%AppName%" %Increment%, , Hide  ; Run asynchronously for faster response
     DisplayVolume(AppName, Increment > 0 ? "increased" : "decreased")
 }
 
 ToggleMute(AppName, IsMuted) {
     global SVVPath
     if (IsMuted) {
-        RunWait, %SVVPath% /UnMute "%AppName%", , Hide  ; Unmute application
+        Run, %SVVPath% /UnMute "%AppName%", , Hide
         DisplayVolume(AppName, "unmuted")
     } else {
-        RunWait, %SVVPath% /Mute "%AppName%", , Hide  ; Mute application
+        Run, %SVVPath% /Mute "%AppName%", , Hide
         DisplayVolume(AppName, "muted")
     }
 }
@@ -85,22 +88,30 @@ ToggleMute(AppName, IsMuted) {
 ; GUI Feedback Function
 ;----------------------------
 DisplayVolume(AppName, Action) {
-    global SVVPath, VolumeText
-    RunWait, %SVVPath% /GetPercent "%AppName%", , Hide  ; Get current volume level
-    VolumeLevel := ErrorLevel  ; ErrorLevel stores volume percentage * 10
-    Volume := Round(VolumeLevel / 10)  ; Convert to actual percentage
+    global SVVPath, VolumeText, VolumeGuiOpen
+    RunWait, %SVVPath% /GetPercent "%AppName%", , Hide
+    VolumeLevel := ErrorLevel
+    Volume := Round(VolumeLevel / 10)
 
-    ; Display GUI notification for volume change
+    ; Update existing GUI if it's already open
+    if (VolumeGuiOpen) {
+        GuiControl,, VolumeText, %AppName%`nVolume %Action%: %Volume%
+        SetTimer, DestroyGUI, -2000  ; Reset close timer
+        return
+    }
+
+    VolumeGuiOpen := True
     Gui, Destroy
     Gui, +AlwaysOnTop +ToolWindow -Caption
-    Gui, Color, EEAA99  ; Pastel Pink background
-    Gui, Font, s20 cBlack, BurbankBigCondensed-bold  ; Custom font for better readability
+    Gui, Color, EEAA99
+    Gui, Font, s20 cBlack, BurbankBigCondensed-bold
     Gui, Add, Text, w300 h50 Center vVolumeText, %AppName%`nVolume %Action%: %Volume%
-    Gui, Show, x10 y10 NoActivate  ; Position GUI at top-left corner without activating window
-    SetTimer, DestroyGUI, -2000  ; Auto-close GUI after 2 seconds
+    Gui, Show, x10 y10 NoActivate
+    SetTimer, DestroyGUI, -2000
     return
 }
 
 DestroyGUI:
-    Gui, Destroy  ; Close volume display GUI
+    VolumeGuiOpen := False
+    Gui, Destroy
     return
